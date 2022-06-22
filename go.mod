@@ -1,4 +1,4 @@
-module github.com/juju/persistent-cookiejar
+module github.com/science-computing/persistent-cookiejar
 
 go 1.17
 
