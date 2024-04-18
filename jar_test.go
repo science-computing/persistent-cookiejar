@@ -15,7 +15,6 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -1715,48 +1714,14 @@ func TestLoadDifferentPublicSuffixList(t *testing.T) {
 	}
 }
 
-func TestLockFile(t *testing.T) {
-	d, err := ioutil.TempDir("", "cookiejar_test")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(d)
-	filename := filepath.Join(d, "lockfile")
-	concurrentCount := int64(0)
-	var wg sync.WaitGroup
-	locker := func() {
-		defer wg.Done()
-		closer, err := lockFile(filename)
-		if err != nil {
-			t.Errorf("cannot obtain lock: %v", err)
-			return
-		}
-		x := atomic.AddInt64(&concurrentCount, 1)
-		if x > 1 {
-			t.Errorf("multiple locks held at one time")
-		}
-		defer closer.Close()
-		time.Sleep(10 * time.Millisecond)
-		atomic.AddInt64(&concurrentCount, -1)
-	}
-	wg.Add(4)
-	for i := 0; i < 4; i++ {
-		go locker()
-	}
-	wg.Wait()
-	if concurrentCount != 0 {
-		t.Errorf("expected no running goroutines left")
-	}
-}
-
 // jarTest encapsulates the following actions on a jar:
-//   1. Perform SetCookies with fromURL and the cookies from setCookies.
-//      (Done at time tNow + 0 ms.)
-//   2. Check that the entries in the jar matches content.
-//      (Done at time tNow + 1001 ms.)
-//   3. For each query in tests: Check that Cookies with toURL yields the
-//      cookies in want.
-//      (Query n done at tNow + (n+2)*1001 ms.)
+//  1. Perform SetCookies with fromURL and the cookies from setCookies.
+//     (Done at time tNow + 0 ms.)
+//  2. Check that the entries in the jar matches content.
+//     (Done at time tNow + 1001 ms.)
+//  3. For each query in tests: Check that Cookies with toURL yields the
+//     cookies in want.
+//     (Query n done at tNow + (n+2)*1001 ms.)
 type jarTest struct {
 	description string   // The description of what this test is supposed to test
 	fromURL     string   // The full URL of the request from which Set-Cookie headers where received

@@ -13,10 +13,8 @@ import (
 	"sort"
 	"time"
 
-	"gopkg.in/retry.v1"
-
-	filelock "go4.org/lock"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/retry.v1"
 )
 
 // Save saves the cookies to the persistent cookie file.
@@ -41,22 +39,23 @@ func (j *Jar) MarshalJSON() ([]byte, error) {
 
 // save is like Save but takes the current time as a parameter.
 func (j *Jar) save(now time.Time) error {
-	locked, err := lockFile(lockFileName(j.filename))
+	tmpPrefix := "_tmp"
+	f, err := os.OpenFile(j.filename+tmpPrefix, os.O_RDWR|os.O_CREATE, 0600)
 	if err != nil {
 		return errgo.Mask(err)
 	}
-	defer locked.Close()
-	f, err := os.OpenFile(j.filename, os.O_RDWR|os.O_CREATE, 0600)
-	if err != nil {
-		return errgo.Mask(err)
-	}
-	defer f.Close()
+	defer func() {
+		f.Close()
+		os.Rename(j.filename+tmpPrefix, j.filename)
+	}()
 	// TODO optimization: if the file hasn't changed since we
 	// loaded it, don't bother with the merge step.
 
+	origF, _ := os.OpenFile(j.filename, os.O_RDONLY, 0600)
+	defer origF.Close()
 	j.mu.Lock()
 	defer j.mu.Unlock()
-	if err := j.mergeFrom(f); err != nil {
+	if err := j.mergeFrom(origF); err != nil {
 		// The cookie file is probably corrupt.
 		log.Printf("cannot read cookie file to merge it; ignoring it: %v", err)
 	}
@@ -79,11 +78,6 @@ func (j *Jar) load() error {
 		// to acquire the lock.
 		return nil
 	}
-	locked, err := lockFile(lockFileName(j.filename))
-	if err != nil {
-		return errgo.Mask(err)
-	}
-	defer locked.Close()
 	f, err := os.Open(j.filename)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -157,16 +151,3 @@ var attempt = retry.LimitTime(3*time.Second, retry.Exponential{
 	Factor:   1.5,
 	MaxDelay: 100 * time.Millisecond,
 })
-
-func lockFile(path string) (io.Closer, error) {
-	for a := retry.Start(attempt, nil); a.Next(); {
-		locker, err := filelock.Lock(path)
-		if err == nil {
-			return locker, nil
-		}
-		if !a.More() {
-			return nil, errgo.Notef(err, "file locked for too long; giving up")
-		}
-	}
-	panic("unreachable")
-}
