@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"gopkg.in/errgo.v1"
-	"gopkg.in/retry.v1"
 )
 
 // Save saves the cookies to the persistent cookie file.
@@ -145,9 +144,3 @@ func (j *Jar) allPersistentEntries() []entry {
 func lockFileName(path string) string {
 	return path + ".lock"
 }
-
-var attempt = retry.LimitTime(3*time.Second, retry.Exponential{
-	Initial:  100 * time.Microsecond,
-	Factor:   1.5,
-	MaxDelay: 100 * time.Millisecond,
-})
