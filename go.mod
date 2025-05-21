@@ -6,7 +6,6 @@ require (
 	github.com/frankban/quicktest v1.14.6
 	golang.org/x/net v0.24.0
 	gopkg.in/errgo.v1 v1.0.1
-	gopkg.in/retry.v1 v1.0.3
 )
 
 require (
